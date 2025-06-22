@@ -97,24 +97,3 @@ async def prompt_analyze(request: PromptRequest):
         "llm_response": fixed_results
 
     }
-
-# Request model
-class AnalyzeRequest(BaseModel):
-    user_id: str
-    prompt: str
-
-# Analyze profile
-@app.post("/analyze-profile")
-async def analyze_profile(request: AnalyzeRequest):
-    try:
-        user_data = await db["users"].find_one({"_id": request.user_id})
-        if not user_data:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        full_prompt = f"Prompt:\n{request.prompt}\n\nUser Info:\n{user_data}"
-        #result = await call_llm(full_prompt)
-
-        #return {"analysis": result}
-    except Exception as e:
-        logger.error(f"Error analyzing profile: {e}")
-        raise HTTPException(status_code=500, detail="Analysis failed")

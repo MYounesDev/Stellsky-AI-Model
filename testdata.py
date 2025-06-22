@@ -13,15 +13,13 @@ fake = Faker()
 
 # MongoDB bağlantısı
 client = MongoClient(MONGO_URI) 
-db = client["Stellsky"]
-users_collection = db["users"]
+db = client["stellsky"]
+users_collection = db["data"]
 
 # Kullanıcı verisi üretici
 def generate_user():
     return {
-        "full_name": fake.name(),
         "username": fake.user_name(),
-        "email": fake.email(),
         "bio": fake.sentence(nb_words=10),
         "profile_picture": fake.image_url(),
         "followers_count": random.randint(0, 10000),

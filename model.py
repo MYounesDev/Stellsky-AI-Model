@@ -12,10 +12,10 @@ load_dotenv()
 async def fetch_results(mongo_query: dict):
     MONGO_URI = os.getenv("MONGO_URI")
     client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
-    db = client["Stellsky"]
-    collection = db["users"]
+    db = client["stellsky"]
+    collection = db["data"]
     cursor = collection.find(mongo_query)
-    results = await cursor.to_list(length=100)
+    results = await cursor.to_list(length=1000)
     return results
 
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -27,7 +27,7 @@ tools = [
 ]
 
 model = genai.GenerativeModel(
-    model_name="gemini-2.5-pro",
+    model_name="gemini-1.5-flash",
     tools=tools
 )
 
@@ -35,7 +35,7 @@ def prepare_prompt(user_input: str) -> str:
     if "profile" in user_input.lower() or "analyze" in user_input.lower():
         return (
            "Search the database for user information. "
-            "If a name is provided, query MongoDB using the 'full_name' field.\n\n"
+            "If a name is provided, query MongoDB using the 'username' field.\n\n"
             f"User query: {user_input}"
         )
     else:
@@ -43,24 +43,29 @@ def prepare_prompt(user_input: str) -> str:
 
 
 async def get_response(user_input: str):
+    prompt = prepare_prompt(user_input)
     user_input = (
         "You are an assistant that answers user questions.\n"
         "If the question requires user profile data, call the MongoDB search function with the appropriate query.\n"
         "Otherwise, answer directly.\n\n"
-        f"User query: {user_input}"
+        f"User query: {prompt}"
     )
-    prompt = prepare_prompt(user_input)
-    response = model.generate_content(prompt)
-
+    response = model.generate_content(user_input)
+    print("response", response)
     candidate = response.candidates[0]
-    part = candidate.content.parts[0]
+    if candidate.content.parts:
+        part = candidate.content.parts[0]
+    else:
+        part = "Modelden içerik alınamadı."
 
-    if part.function_call:
+    print("part", candidate)
+    if hasattr(part, 'function_call') and part.function_call:
         function_call = part.function_call
         print(f"Function to call: {function_call.name}")
         print(f"Arguments: {function_call.args}")
 
-        mongo_query = function_call.args["query"]
+        mongo_query = dict(function_call.args["query"])
+        print("MongoDB Query:", mongo_query)
         results = await fetch_results(mongo_query)
         print("MongoDB Results:", results)
 
@@ -77,7 +82,9 @@ async def get_response(user_input: str):
         return analysis_text
     else:
         print("No function call found.")
-        direct_text = part.text
+        if hasattr(part, 'text'):
+            direct_text = part.text
+        else:
+            direct_text = str(part)
         print(direct_text)
         return direct_text
-
